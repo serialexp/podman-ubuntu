@@ -19,7 +19,8 @@ permissions:
 jobs:
   release:
     name: Build, test and publish
-    runs-on: docker
+    # The docker build steps put this on a full VM.
+    runs-on: ubuntu-latest
     timeout-minutes: 360
     env:
       TAG: ${{ inputs.tag }}
