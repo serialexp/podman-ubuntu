@@ -28,12 +28,12 @@ catatonit is `0.2.1-2build1`). Binaries stay at `/usr/bin` so Ubuntu's AppArmor
 
 ## Building
 
-Each Ubuntu release builds in its own container; the output is the `.deb`
-files and a `SHA256SUMS-ubuntu<release>`:
+Each Ubuntu release builds in its own container; the output, in
+`dist/<release>/`, is the `.deb` files and a `SHA256SUMS-ubuntu<release>`:
 
 ```sh
-docker build --build-arg UBUNTU=24.04 --output type=local,dest=dist/24.04 .
-docker build --build-arg UBUNTU=26.04 --output type=local,dest=dist/26.04 .
+scripts/dist.sh 24.04
+scripts/dist.sh 26.04
 ```
 
 `scripts/fetch.sh` refuses a tag that no longer resolves to its pinned

@@ -35,10 +35,10 @@ jobs:
           test "$TAG" = "v$PODMAN_VERSION-$REVISION"
 
       - name: Build for 24.04
-        run: docker build --build-arg UBUNTU=24.04 --output type=local,dest=dist/24.04 .
+        run: scripts/dist.sh 24.04
 
       - name: Build for 26.04
-        run: docker build --build-arg UBUNTU=26.04 --output type=local,dest=dist/26.04 .
+        run: scripts/dist.sh 26.04
 
       - name: Smoke test
         run: |

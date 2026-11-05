@@ -1,6 +1,5 @@
-# Builds the Podman stack's .deb packages for one Ubuntu release:
-#
-#   docker build --build-arg UBUNTU=24.04 --output type=local,dest=dist/24.04 .
+# Builds the Podman stack's .deb packages for one Ubuntu release into /out
+# of the final image; scripts/dist.sh copies them to dist/<release>.
 #
 # Each component is its own step, so a change to one rebuilds only it and
 # what follows.
@@ -39,4 +38,4 @@ COPY scripts/package.sh /build/scripts/
 RUN /build/scripts/package.sh
 
 FROM scratch
-COPY --from=build /out/ /
+COPY --from=build /out/ /out/
