@@ -28,7 +28,7 @@ case "${1:-}" in
     ;;
   *) echo "usage: smoke.sh fresh|upgrade" >&2; exit 2 ;;
 esac
-apt-get install -y -qq /dist/*.deb podman-compose curl >/dev/null
+apt-get install -y -qq /dist/*.deb podman-compose curl iproute2 >/dev/null
 
 podman --version
 crun --version | head -1
@@ -65,7 +65,16 @@ podman network rm smoke >/dev/null
 
 # Rootless, the reason this stack exists: with rootless_port_forwarder =
 # "pasta", a port published from a bridge network sees the client's real
-# address. The client is this container, connecting to its own address.
+# address. The client must be off this host: pasta gives a connection from
+# one of the host's own addresses a link-local source instead. So it is a
+# network namespace of its own, on a veth pair.
+ip netns add client
+ip link add smoke0 type veth peer name smoke1 netns client
+ip addr add 192.0.2.1/24 dev smoke0
+ip link set smoke0 up
+ip -n client addr add 192.0.2.2/24 dev smoke1
+ip -n client link set smoke1 up
+ip -n client link set lo up
 # Its home, where rootless storage lives, is on the volume too.
 home=/var/lib/containers/smoke
 useradd -m -d "$home" smoke
@@ -82,7 +91,6 @@ as_smoke() {
   setpriv --reuid smoke --regid smoke --init-groups \
     env HOME="$home" XDG_RUNTIME_DIR="/run/user/$uid" "$@"
 }
-address=$(hostname -I | awk '{print $1}')
 client_address() {
   as_smoke env CONTAINERS_CONF_OVERRIDE="$home/$1.conf" sh -ec '
     podman network create smoke >/dev/null
@@ -92,7 +100,9 @@ client_address() {
       chmod +x /www/cgi-bin/ip
       exec httpd -f -p 8080 -h /www" >/dev/null'
   local seen
-  seen=$(curl -fsS --retry 10 --retry-connrefused --retry-delay 1 "http://$address:8081/cgi-bin/ip" | tr -d '\r\n')
+  # busybox httpd reports an IPv4 client as [::ffff:a.b.c.d].
+  seen=$(ip netns exec client curl -fsS --retry 10 --retry-connrefused --retry-delay 1 \
+    http://192.0.2.1:8081/cgi-bin/ip | tr -d '\r\n' | sed -e 's/^\[::ffff://' -e 's/\]$//')
   as_smoke env CONTAINERS_CONF_OVERRIDE="$home/$1.conf" sh -ec 'podman rm -f -t 0 ip >/dev/null; podman network rm smoke >/dev/null'
   echo "$seen"
 }
@@ -103,7 +113,7 @@ done
 seen=$(client_address rootlessport)
 echo "rootless, rootlessport: the container sees $seen"
 seen=$(client_address pasta)
-echo "rootless, pasta: the container sees $seen (client $address)"
-[ "$seen" = "$address" ]
+echo "rootless, pasta: the container sees $seen (client 192.0.2.2)"
+[ "$seen" = 192.0.2.2 ]
 
 echo "smoke: ok"
