@@ -1,0 +1,9 @@
+Package: catatonit
+Version: @VERSION@
+Architecture: amd64
+Maintainer: Bart Riepe <bart@serial-experiments.com>
+Section: admin
+Priority: optional
+Homepage: https://gothab.io/serialexp/podman-ubuntu
+Depends: @SHLIBS@
+Description: init process for containers (upstream @UPSTREAM@)

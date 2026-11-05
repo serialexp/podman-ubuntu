@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# Installs the built packages into a clean Ubuntu container and checks that
+# the stack fits together. Runs inside a privileged `ubuntu:<release>` with
+# dist/<release> mounted at /dist and a volume at /var/lib/containers, since
+# overlay storage can't sit on the outer container's overlayfs (see the
+# workflow).
+#
+#   smoke.sh fresh     install on a system without Podman
+#   smoke.sh upgrade   install Ubuntu's Podman first, then ours over it, as
+#                      on a host that already has it
+set -euo pipefail
+shopt -s inherit_errexit
+export DEBIAN_FRONTEND=noninteractive
+
+# The outer container's cgroup is the root of its namespace and holds its
+# processes, so controllers can't be enabled for children (cgroup v2's
+# no-internal-processes rule). Move everything into a leaf and delegate, as
+# docker-in-docker does.
+mkdir -p /sys/fs/cgroup/init
+xargs -rn1 </sys/fs/cgroup/cgroup.procs >/sys/fs/cgroup/init/cgroup.procs 2>/dev/null || true
+sed -e 's/ / +/g' -e 's/^/+/' </sys/fs/cgroup/cgroup.controllers >/sys/fs/cgroup/cgroup.subtree_control
+apt-get update -qq
+case "${1:-}" in
+  fresh) ;;
+  upgrade)
+    apt-get install -y -qq podman >/dev/null
+    echo "Ubuntu's: $(podman --version)"
+    ;;
+  *) echo "usage: smoke.sh fresh|upgrade" >&2; exit 2 ;;
+esac
+apt-get install -y -qq /dist/*.deb podman-compose curl >/dev/null
+
+podman --version
+crun --version | head -1
+conmon --version | head -1
+/usr/lib/podman/netavark --version
+/usr/lib/podman/aardvark-dns --version
+pasta --version | head -1
+pesto --version 2>&1 | head -1
+catatonit --version 2>&1 | head -1
+podman-compose --version | tail -1
+
+# Every package must be ours: none of Ubuntu's may have won.
+for pkg in podman crun conmon netavark aardvark-dns passt catatonit \
+  golang-github-containers-common golang-github-containers-image containers-storage; do
+  version=$(dpkg-query -W -f='${Version}' "$pkg")
+  case "$version" in
+    *-1000sp*) echo "$pkg $version" ;;
+    *) echo "$pkg is $version, not ours" >&2; exit 1 ;;
+  esac
+done
+
+podman info --format '{{.Host.NetworkBackend}} {{.Host.OCIRuntime.Name}} {{.Version.Version}}'
+podman info --format '{{.Host.NetworkBackend}}' | grep -qx netavark
+podman info --format '{{.Host.OCIRuntime.Name}}' | grep -qx crun
+
+# A container on a netavark bridge, with aardvark-dns resolving its name.
+podman network create smoke >/dev/null
+podman run -d --name web --network smoke docker.io/library/busybox:latest \
+  httpd -f -p 8080 -h /etc >/dev/null
+podman run --rm --network smoke docker.io/library/busybox:latest \
+  wget -q -O /dev/null http://web:8080/hostname
+podman rm -f -t 0 web >/dev/null
+podman network rm smoke >/dev/null
+
+# Rootless, the reason this stack exists: with rootless_port_forwarder =
+# "pasta", a port published from a bridge network sees the client's real
+# address. The client is this container, connecting to its own address.
+# Its home, where rootless storage lives, is on the volume too.
+home=/var/lib/containers/smoke
+useradd -m -d "$home" smoke
+uid=$(id -u smoke)
+install -d -o smoke -g smoke -m 700 "/run/user/$uid"
+# No systemd user session in here.
+install -d -o smoke -g smoke "$home/.config" "$home/.config/containers"
+install -o smoke -g smoke -m 644 /dev/stdin "$home/.config/containers/containers.conf" <<'EOF'
+[engine]
+cgroup_manager = "cgroupfs"
+events_logger = "file"
+EOF
+as_smoke() {
+  setpriv --reuid smoke --regid smoke --init-groups \
+    env HOME="$home" XDG_RUNTIME_DIR="/run/user/$uid" "$@"
+}
+address=$(hostname -I | awk '{print $1}')
+client_address() {
+  as_smoke env CONTAINERS_CONF_OVERRIDE="$home/$1.conf" sh -ec '
+    podman network create smoke >/dev/null
+    podman run -d --name ip --network smoke -p 8081:8080 docker.io/library/busybox:latest sh -c "
+      mkdir -p /www/cgi-bin
+      printf \"#!/bin/sh\necho\necho \\\$REMOTE_ADDR\n\" >/www/cgi-bin/ip
+      chmod +x /www/cgi-bin/ip
+      exec httpd -f -p 8080 -h /www" >/dev/null'
+  local seen
+  seen=$(curl -fsS --retry 10 --retry-connrefused --retry-delay 1 "http://$address:8081/cgi-bin/ip" | tr -d '\r\n')
+  as_smoke env CONTAINERS_CONF_OVERRIDE="$home/$1.conf" sh -ec 'podman rm -f -t 0 ip >/dev/null; podman network rm smoke >/dev/null'
+  echo "$seen"
+}
+for forwarder in rootlessport pasta; do
+  printf '[network]\nrootless_port_forwarder = "%s"\n' "$forwarder" |
+    install -o smoke -g smoke -m 644 /dev/stdin "$home/$forwarder.conf"
+done
+seen=$(client_address rootlessport)
+echo "rootless, rootlessport: the container sees $seen"
+seen=$(client_address pasta)
+echo "rootless, pasta: the container sees $seen (client $address)"
+[ "$seen" = "$address" ]
+
+echo "smoke: ok"

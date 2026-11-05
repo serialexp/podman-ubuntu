@@ -1,0 +1,55 @@
+# Builds the packages for every supported Ubuntu release from a tag that
+# already exists, smoke-tests them in a clean container (fresh, and over
+# Ubuntu's own Podman), and publishes them as one Gothab release. Tags are
+# <podman version>-<REVISION>, for example v6.1.4-1. Push the tag, then run
+# this from the Actions page (or POST
+# /repos/serialexp/podman-ubuntu/actions/dispatches).
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release, for example v6.1.4-1
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, test and publish
+    runs-on: docker
+    timeout-minutes: 360
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+
+      - name: Check the tag matches versions.env
+        run: |
+          . ./versions.env
+          test "$TAG" = "v$PODMAN_VERSION-$REVISION"
+
+      - name: Build for 24.04
+        run: docker build --build-arg UBUNTU=24.04 --output type=local,dest=dist/24.04 .
+
+      - name: Build for 26.04
+        run: docker build --build-arg UBUNTU=26.04 --output type=local,dest=dist/26.04 .
+
+      - name: Smoke test
+        run: |
+          for ubuntu in 24.04 26.04; do
+            for mode in fresh upgrade; do
+              echo "::group::$ubuntu $mode"
+              docker run --rm --privileged -v /var/lib/containers \
+                -v "$PWD/dist/$ubuntu:/dist:ro" -v "$PWD/scripts/smoke.sh:/smoke.sh:ro" \
+                "ubuntu:$ubuntu" /smoke.sh "$mode"
+              echo "::endgroup::"
+            done
+          done
+
+      - name: Publish
+        run: gt release create "$TAG" dist/*/* -R "$GITHUB_REPOSITORY"

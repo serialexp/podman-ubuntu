@@ -1,0 +1,6 @@
+/etc/apparmor.d/abstractions/passt
+/etc/apparmor.d/abstractions/pasta
+/etc/apparmor.d/usr.bin.passt
+/etc/apparmor.d/usr.bin.passt-repair
+/etc/apparmor.d/usr.bin.pasta
+/etc/apparmor.d/usr.bin.pesto

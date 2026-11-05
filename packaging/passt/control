@@ -1,0 +1,12 @@
+Package: passt
+Version: @VERSION@
+Architecture: amd64
+Maintainer: Bart Riepe <bart@serial-experiments.com>
+Section: admin
+Priority: optional
+Homepage: https://gothab.io/serialexp/podman-ubuntu
+Depends: @SHLIBS@
+Recommends: apparmor
+Description: user-mode networking for VMs and namespaces (upstream @UPSTREAM@)
+ Includes pasta, passt-repair and pesto, the port forwarder Podman's
+ rootless_port_forwarder = "pasta" uses.

@@ -1,0 +1,9 @@
+Package: netavark
+Version: @VERSION@
+Architecture: amd64
+Maintainer: Bart Riepe <bart@serial-experiments.com>
+Section: admin
+Priority: optional
+Homepage: https://gothab.io/serialexp/podman-ubuntu
+Depends: @SHLIBS@, nftables, aardvark-dns (>= 2.1.0)
+Description: container network stack for Podman (upstream @UPSTREAM@)

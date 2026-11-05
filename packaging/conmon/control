@@ -1,0 +1,9 @@
+Package: conmon
+Version: @VERSION@
+Architecture: amd64
+Maintainer: Bart Riepe <bart@serial-experiments.com>
+Section: admin
+Priority: optional
+Homepage: https://gothab.io/serialexp/podman-ubuntu
+Depends: @SHLIBS@
+Description: OCI container runtime monitor (upstream @UPSTREAM@)

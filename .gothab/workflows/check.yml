@@ -1,0 +1,35 @@
+# Builds and smoke-tests the packages for every supported Ubuntu release on
+# each push, without publishing. The Release workflow does the same for a tag
+# and then publishes.
+name: Check
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Build and test
+    runs-on: docker
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build for 24.04
+        run: docker build --build-arg UBUNTU=24.04 --output type=local,dest=dist/24.04 .
+
+      - name: Build for 26.04
+        run: docker build --build-arg UBUNTU=26.04 --output type=local,dest=dist/26.04 .
+
+      - name: Smoke test
+        run: |
+          for ubuntu in 24.04 26.04; do
+            for mode in fresh upgrade; do
+              echo "::group::$ubuntu $mode"
+              docker run --rm --privileged -v /var/lib/containers \
+                -v "$PWD/dist/$ubuntu:/dist:ro" -v "$PWD/scripts/smoke.sh:/smoke.sh:ro" \
+                "ubuntu:$ubuntu" /smoke.sh "$mode"
+              echo "::endgroup::"
+            done
+          done

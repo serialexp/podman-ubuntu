@@ -1,0 +1,9 @@
+#!/bin/sh
+# Loads the AppArmor profiles, as dh_apparmor does for Ubuntu's passt.
+set -e
+if [ "$1" = configure ] && command -v apparmor_parser >/dev/null 2>&1 && aa-enabled --quiet 2>/dev/null; then
+  for profile in usr.bin.passt usr.bin.passt-repair usr.bin.pasta usr.bin.pesto; do
+    apparmor_parser -r -T -W "/etc/apparmor.d/$profile" || true
+  done
+fi
+exit 0

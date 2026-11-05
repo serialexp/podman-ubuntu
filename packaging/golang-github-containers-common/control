@@ -1,0 +1,8 @@
+Package: golang-github-containers-common
+Version: @VERSION@
+Architecture: all
+Maintainer: Bart Riepe <bart@serial-experiments.com>
+Section: admin
+Priority: optional
+Homepage: https://gothab.io/serialexp/podman-ubuntu
+Description: configuration files for containers: containers.conf, seccomp, policy (upstream @UPSTREAM@)

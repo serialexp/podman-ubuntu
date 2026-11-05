@@ -1,0 +1,10 @@
+Package: containers-storage
+Version: @VERSION@
+Architecture: all
+Maintainer: Bart Riepe <bart@serial-experiments.com>
+Section: admin
+Priority: optional
+Homepage: https://gothab.io/serialexp/podman-ubuntu
+Description: storage.conf for container tools (upstream @UPSTREAM@)
+ Only the configuration, without the containers-storage tool Ubuntu's
+ package also ships.
