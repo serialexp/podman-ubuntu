@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Prints the rsansible variables that pin one release's packages: the asset
-# URL and SHA-256 of every .deb, per Ubuntu release. Gothab release assets
-# have no by-name URL, so hosts pin these until the packages are in an apt
+# Prints the rsansible variables that pin one release's packages: the
+# version, asset URL and SHA-256 of every .deb, per Ubuntu release, sorted by
+# package name as dpkg-query lists them. Gothab release assets have no
+# by-name URL, so hosts pin these until the packages are in an apt
 # repository.
 #
 #   scripts/pins.sh v6.1.4-1 > vars/podman.yml
@@ -23,9 +24,13 @@ for sums in $(jq -r '.assets[].name | select(startswith("SHA256SUMS-ubuntu"))' <
   while read -r sha name; do
     deb=$(jq -r --arg n "$name" '.assets[] | select(.name == $n) | .id' <<<"$release")
     [ -n "$deb" ] || { echo "$name is in $sums but not in the release" >&2; exit 1; }
+    # name_version_arch.deb
+    version=${name#*_}
+    version=${version%_*}
     echo "    - name: ${name%%_*}"
+    echo "      version: \"$version\""
     echo "      file: $name"
     echo "      url: \"$base/$id/assets/$deb\""
     echo "      sha256: $sha"
-  done < <(curl -fsSL "$base/$id/assets/$asset")
+  done < <(curl -fsSL "$base/$id/assets/$asset" | LC_ALL=C sort -k2)
 done
