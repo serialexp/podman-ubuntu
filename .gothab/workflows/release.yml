@@ -45,7 +45,7 @@ jobs:
           for ubuntu in 24.04 26.04; do
             for mode in fresh upgrade; do
               echo "::group::$ubuntu $mode"
-              docker run --rm --privileged -v /var/lib/containers \
+              docker run --rm --privileged -e SMOKE_APPARMOR=1 -v /var/lib/containers \
                 -v "$PWD/dist/$ubuntu:/dist:ro" -v "$PWD/scripts/smoke.sh:/smoke.sh:ro" \
                 "ubuntu:$ubuntu" /smoke.sh "$mode"
               echo "::endgroup::"

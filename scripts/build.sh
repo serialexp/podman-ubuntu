@@ -43,6 +43,12 @@ case "$1" in
     cd "$SRC/passt"
     make -j"$jobs" prefix=/usr VERSION="$PASST_TAG"
     make install DESTDIR="$STAGE/passt" prefix=/usr VERSION="$PASST_TAG"
+    # Upstream installs pasta as a symlink to passt. AppArmor attaches
+    # profiles to the resolved path, so pasta would run under passt's
+    # profile, which doesn't allow Podman's rootless-netns files. Hard
+    # links, as Ubuntu's package has them, keep pasta under its own.
+    ln -f "$STAGE/passt/usr/bin/passt" "$STAGE/passt/usr/bin/pasta"
+    ln -f "$STAGE/passt/usr/bin/passt.avx2" "$STAGE/passt/usr/bin/pasta.avx2"
     install -d "$STAGE/passt/etc/apparmor.d/abstractions"
     install -m 644 contrib/apparmor/abstractions/* "$STAGE/passt/etc/apparmor.d/abstractions/"
     install -m 644 contrib/apparmor/usr.bin.* "$STAGE/passt/etc/apparmor.d/"

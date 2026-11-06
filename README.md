@@ -52,7 +52,9 @@ The last check runs rootless Podman with `rootless_port_forwarder = "pasta"`
 and asserts that a published port sees the client's address. The host's
 AppArmor policy applies inside the container: a host with an older passt
 installed confines the new pasta with its old profile, and the check fails
-with `Permission denied` from pasta.
+with `Permission denied` from pasta. CI sets `SMOKE_APPARMOR=1`, which loads
+the packages' own profiles into the (throwaway) VM's kernel so the check runs
+confined as on a real host; don't set it on a machine you care about.
 
 ## Releasing
 

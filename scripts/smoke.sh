@@ -8,6 +8,11 @@
 #   smoke.sh fresh     install on a system without Podman
 #   smoke.sh upgrade   install Ubuntu's Podman first, then ours over it, as
 #                      on a host that already has it
+#
+# With SMOKE_APPARMOR=1 it also installs apparmor, so the packages load their
+# profiles, and the rootless check runs confined as on a real host. Profiles
+# load into the kernel the container shares with its host, so set it only on
+# a throwaway machine such as a CI VM.
 set -euo pipefail
 shopt -s inherit_errexit
 export DEBIAN_FRONTEND=noninteractive
@@ -28,7 +33,23 @@ case "${1:-}" in
     ;;
   *) echo "usage: smoke.sh fresh|upgrade" >&2; exit 2 ;;
 esac
+if [ "${SMOKE_APPARMOR:-}" = 1 ]; then
+  mountpoint -q /sys/kernel/security || mount -t securityfs securityfs /sys/kernel/security
+  apt-get install -y -qq apparmor >/dev/null
+  aa-enabled
+fi
 apt-get install -y -qq /dist/*.deb podman-compose curl iproute2 >/dev/null
+if [ "${SMOKE_APPARMOR:-}" = 1 ]; then
+  for profile in passt pasta pesto; do
+    grep -q "^$profile (enforce)" /sys/kernel/security/apparmor/profiles
+  done
+  echo "AppArmor: passt, pasta and pesto profiles loaded"
+fi
+# AppArmor attaches profiles to the resolved path, so pasta must not be a
+# symlink to passt (see build.sh).
+for bin in pasta pasta.avx2; do
+  [ ! -L "/usr/bin/$bin" ] || { echo "/usr/bin/$bin is a symlink" >&2; exit 1; }
+done
 
 podman --version
 crun --version | head -1
