@@ -41,6 +41,9 @@ case "$1" in
     ;;
   passt)
     cd "$SRC/passt"
+    for patch in /build/patches/passt/*.patch; do
+      git apply "$patch"
+    done
     make -j"$jobs" prefix=/usr VERSION="$PASST_TAG"
     make install DESTDIR="$STAGE/passt" prefix=/usr VERSION="$PASST_TAG"
     # Upstream installs pasta as a symlink to passt. AppArmor attaches

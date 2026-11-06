@@ -20,7 +20,8 @@ The packages, all built from pinned upstream tags in [`versions.env`](versions.e
 | golang-github-containers-image | containers/container-libs `image/` (registries.conf) |
 | containers-storage | containers/container-libs `storage/` (storage.conf only) |
 
-They use Ubuntu's package names and file layout, so they upgrade Ubuntu's own
+Patches to upstream are in `patches/<component>/`, applied in order at build
+time. They use Ubuntu's package names and file layout, so they upgrade Ubuntu's own
 packages in place, and versions `<upstream>-1000sp<REVISION>~ubuntu<release>`,
 which sort above Ubuntu's even at the same upstream version (26.04's
 catatonit is `0.2.1-2build1`). Binaries stay at `/usr/bin` so Ubuntu's AppArmor

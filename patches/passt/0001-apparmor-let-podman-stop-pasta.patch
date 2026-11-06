@@ -1,0 +1,17 @@
+Podman 6 stops the rootless-netns pasta with SIGTERM when it tears the
+namespace down; the profile denied it (peer="podman" on Ubuntu, whose
+podman runs under its own profile), so container removal failed.
+
+diff --git a/contrib/apparmor/usr.bin.pasta b/contrib/apparmor/usr.bin.pasta
+index 31469ad..07818b9 100644
+--- a/contrib/apparmor/usr.bin.pasta
++++ b/contrib/apparmor/usr.bin.pasta
+@@ -30,4 +30,8 @@ profile pasta /usr/bin/pasta{,.avx2} flags=(attach_disconnected) {
+ 
+   owner @{HOME}/**			w,	# pcap(), pidfile_open(),
+ 						# pidfile_write()
++
++  # Podman 6 stops the rootless-netns pasta with SIGTERM when it tears the
++  # namespace down. Ubuntu runs podman under its own "podman" profile.
++  signal (receive) peer={podman,unconfined},
+ }

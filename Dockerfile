@@ -24,6 +24,7 @@ COPY scripts/fetch.sh /build/scripts/
 RUN /build/scripts/fetch.sh
 
 COPY scripts/build.sh /build/scripts/
+COPY patches /build/patches
 RUN /build/scripts/build.sh podman
 RUN /build/scripts/build.sh crun
 RUN /build/scripts/build.sh conmon
