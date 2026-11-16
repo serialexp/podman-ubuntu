@@ -1,0 +1,12 @@
+Package: podman-compose
+Version: @VERSION@
+Architecture: all
+Maintainer: Bart Riepe <bart@serial-experiments.com>
+Section: admin
+Priority: optional
+Homepage: https://gothab.io/serialexp/podman-ubuntu
+Depends: python3:any, python3-dotenv, python3-yaml
+Recommends: podman
+Description: run docker-compose.yml using podman (upstream @UPSTREAM@)
+ podman-compose built from upstream for Ubuntu. 24.04's 1.0.6 cannot run
+ `up` against Podman 6 once a project has containers.

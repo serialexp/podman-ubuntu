@@ -65,6 +65,22 @@ case "$1" in
     install -d "$STAGE/catatonit/usr/libexec/podman"
     ln -s ../../bin/catatonit "$STAGE/catatonit/usr/libexec/podman/catatonit"
     ;;
+  podman-compose)
+    # One Python module and a launcher, laid out as Ubuntu's package has
+    # them; postinst byte-compiles the module as dh_python3 would.
+    p="$STAGE/podman-compose"
+    install -D -m 644 "$SRC/podman-compose/podman_compose.py" "$p/usr/lib/python3/dist-packages/podman_compose.py"
+    install -D -m 755 /dev/stdin "$p/usr/bin/podman-compose" <<'EOF'
+#!/usr/bin/python3
+import sys
+from podman_compose import main
+if __name__ == "__main__":
+    sys.exit(main())
+EOF
+    install -D -m 644 "$SRC/podman-compose/completion/bash/podman-compose" \
+      "$p/usr/share/bash-completion/completions/podman-compose"
+    install -D -m 644 "$SRC/podman-compose/LICENSE" "$p/usr/share/doc/podman-compose/copyright"
+    ;;
   configs)
     # The same split as Ubuntu's packages, so these upgrade them in place.
     c="$STAGE/golang-github-containers-common"

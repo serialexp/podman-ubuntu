@@ -12,6 +12,7 @@ declare -A upstream=(
   [aardvark-dns]=$AARDVARK_DNS_VERSION
   [passt]=$PASST_VERSION
   [catatonit]=$CATATONIT_VERSION
+  [podman-compose]=$PODMAN_COMPOSE_VERSION
   [golang-github-containers-common]=$COMMON_VERSION
   [golang-github-containers-image]=$IMAGE_VERSION
   [containers-storage]=$STORAGE_VERSION

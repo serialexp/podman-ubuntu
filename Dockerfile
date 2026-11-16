@@ -32,6 +32,7 @@ RUN /build/scripts/build.sh netavark
 RUN /build/scripts/build.sh aardvark-dns
 RUN /build/scripts/build.sh passt
 RUN /build/scripts/build.sh catatonit
+RUN /build/scripts/build.sh podman-compose
 RUN /build/scripts/build.sh configs
 
 COPY packaging /build/packaging

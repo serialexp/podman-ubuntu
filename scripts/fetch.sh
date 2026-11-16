@@ -26,4 +26,5 @@ fetch catatonit https://github.com/openSUSE/catatonit.git "$CATATONIT_TAG" "$CAT
 fetch common https://github.com/containers/container-libs.git "$COMMON_TAG" "$COMMON_COMMIT"
 fetch image https://github.com/containers/container-libs.git "$IMAGE_TAG" "$IMAGE_COMMIT"
 fetch storage https://github.com/containers/container-libs.git "$STORAGE_TAG" "$STORAGE_COMMIT"
+fetch podman-compose https://github.com/containers/podman-compose.git "$PODMAN_COMPOSE_TAG" "$PODMAN_COMPOSE_COMMIT"
 fetch shortnames https://github.com/containers/shortnames.git "$SHORTNAMES_TAG" "$SHORTNAMES_COMMIT"

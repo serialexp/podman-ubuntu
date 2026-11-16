@@ -16,6 +16,7 @@ The packages, all built from pinned upstream tags in [`versions.env`](versions.e
 | aardvark-dns | containers/aardvark-dns |
 | passt | passt (pasta and pesto, with their AppArmor profiles) |
 | catatonit | openSUSE/catatonit |
+| podman-compose | containers/podman-compose (24.04's 1.0.6 can't `up` a project with containers on Podman 6) |
 | golang-github-containers-common | containers/container-libs `common/` (containers.conf, seccomp.json, policy.json, short names) |
 | golang-github-containers-image | containers/container-libs `image/` (registries.conf) |
 | containers-storage | containers/container-libs `storage/` (storage.conf only) |

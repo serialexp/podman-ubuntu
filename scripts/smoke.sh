@@ -6,8 +6,8 @@
 # workflow).
 #
 #   smoke.sh fresh     install on a system without Podman
-#   smoke.sh upgrade   install Ubuntu's Podman first, then ours over it, as
-#                      on a host that already has it
+#   smoke.sh upgrade   install Ubuntu's Podman and podman-compose first, then
+#                      ours over them, as on a host that already has them
 #
 # With SMOKE_APPARMOR=1 it also installs apparmor, so the packages load their
 # profiles, and the rootless check runs confined as on a real host. Profiles
@@ -28,8 +28,8 @@ apt-get update -qq
 case "${1:-}" in
   fresh) ;;
   upgrade)
-    apt-get install -y -qq podman >/dev/null
-    echo "Ubuntu's: $(podman --version)"
+    apt-get install -y -qq podman podman-compose >/dev/null
+    echo "Ubuntu's: $(podman --version), podman-compose $(dpkg-query -W -f='${Version}' podman-compose)"
     ;;
   *) echo "usage: smoke.sh fresh|upgrade" >&2; exit 2 ;;
 esac
@@ -38,7 +38,7 @@ if [ "${SMOKE_APPARMOR:-}" = 1 ]; then
   apt-get install -y -qq apparmor >/dev/null
   aa-enabled
 fi
-apt-get install -y -qq /dist/*.deb podman-compose curl iproute2 >/dev/null
+apt-get install -y -qq /dist/*.deb curl iproute2 >/dev/null
 if [ "${SMOKE_APPARMOR:-}" = 1 ]; then
   for profile in passt pasta pesto; do
     grep -q "^$profile (enforce)" /sys/kernel/security/apparmor/profiles
@@ -62,7 +62,7 @@ catatonit --version 2>&1 | head -1
 podman-compose --version | tail -1
 
 # Every package must be ours: none of Ubuntu's may have won.
-for pkg in podman crun conmon netavark aardvark-dns passt catatonit \
+for pkg in podman crun conmon netavark aardvark-dns passt catatonit podman-compose \
   golang-github-containers-common golang-github-containers-image containers-storage; do
   version=$(dpkg-query -W -f='${Version}' "$pkg")
   case "$version" in
@@ -83,6 +83,32 @@ podman run --rm --network smoke docker.io/library/busybox:latest \
   wget -q -O /dev/null http://web:8080/hostname
 podman rm -f -t 0 web >/dev/null
 podman network rm smoke >/dev/null
+
+# podman-compose against an existing project: a second `up` reads the config
+# hash of the containers already there (1.0.6 does it with a template
+# Podman 6 refuses), and --force-recreate replaces only what it names.
+mkdir /compose
+cat >/compose/compose.yaml <<'EOF'
+services:
+  web:
+    image: docker.io/library/busybox:latest
+    command: ["sh", "-c", "trap exit TERM; sleep 600 & wait"]
+  side:
+    image: docker.io/library/busybox:latest
+    command: ["sh", "-c", "trap exit TERM; sleep 600 & wait"]
+EOF
+compose() { podman-compose -p smoke -f /compose/compose.yaml "$@" >/dev/null; }
+id_of() { podman inspect --format '{{.Id}}' "smoke_$1_1"; }
+compose up -d
+web=$(id_of web) side=$(id_of side)
+compose up -d
+[ "$(id_of web)" = "$web" ] || { echo "a second up recreated web" >&2; exit 1; }
+compose up -d --force-recreate web
+[ "$(id_of web)" != "$web" ] || { echo "--force-recreate left web as it was" >&2; exit 1; }
+[ "$(id_of side)" = "$side" ] || { echo "--force-recreate web recreated side" >&2; exit 1; }
+[ "$(podman inspect --format '{{.State.Running}}' smoke_web_1)" = true ]
+compose down
+echo "podman-compose: up, up again, --force-recreate one service"
 
 # Rootless, the reason this stack exists: with rootless_port_forwarder =
 # "pasta", a port published from a bridge network sees the client's real
