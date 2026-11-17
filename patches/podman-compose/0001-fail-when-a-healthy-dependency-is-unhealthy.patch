@@ -1,0 +1,89 @@
+Without this, `podman-compose up` waits for ever on a service_healthy
+dependency that turns unhealthy, has no healthcheck or exits: it polls
+`podman wait --condition=healthy`, which never returns for those. Compose
+has by then removed the old containers, so a caller with a deadline kills it
+and leaves the stack down. Poll the dependency's state instead and fail the
+dependent's start, with an error and a nonzero exit, once Podman reports the
+dependency unhealthy (after the healthcheck's own retries), without a
+healthcheck, or not running.
+
+diff --git a/podman_compose.py b/podman_compose.py
+index c3c44cc..6cdc3cc 100755
+--- a/podman_compose.py
++++ b/podman_compose.py
+@@ -3026,6 +3026,51 @@ def get_excluded(compose: PodmanCompose, args: argparse.Namespace) -> set[str]:
+     return excluded
+ 
+ 
++class DependencyFailedError(Exception):
++    """A dependency can no longer meet the condition it is waited on for"""
++
++
++async def wait_for_healthy(compose: PodmanCompose, names: list[str]) -> None:
++    """Wait until every container is healthy.
++
++    `podman wait --condition=healthy` never returns for a container that
++    turns unhealthy or stops, so a stack whose dependency never became
++    healthy blocked `up` for ever, after it had already removed the old
++    containers. Poll instead, and give up once Podman reports a container
++    unhealthy (after the healthcheck's own retries) or no longer running.
++    """
++    while True:
++        waiting = []
++        for name in names:
++            try:
++                out = await compose.podman.output(
++                    [],
++                    "inspect",
++                    [
++                        "--format",
++                        "{{.State.Status}} {{if .Config.Healthcheck}}{{.State.Health.Status}}"
++                        "{{else}}none{{end}}",
++                        name,
++                    ],
++                )
++            except subprocess.CalledProcessError:
++                waiting.append(name)
++                continue
++            status, _, health = out.decode().strip().partition(" ")
++            if health == "healthy":
++                continue
++            if health == "none":
++                raise DependencyFailedError(f"container {name} has no healthcheck")
++            if health == "unhealthy":
++                raise DependencyFailedError(f"container {name} is unhealthy")
++            if status in ("exited", "stopped", "dead", "removing"):
++                raise DependencyFailedError(f"container {name} is {status}")
++            waiting.append(name)
++        if not waiting:
++            return
++        await asyncio.sleep(1)
++
++
+ async def check_dep_conditions(compose: PodmanCompose, deps: set) -> None:
+     """Enforce that all specified conditions in deps are met"""
+     if not deps:
+@@ -3052,6 +3097,10 @@ async def check_dep_conditions(compose: PodmanCompose, deps: set) -> None:
+ 
+                 deps_cd.extend(compose.container_names_by_service[d.name])
+ 
++        if deps_cd and condition == ServiceDependencyCondition.HEALTHY:
++            await wait_for_healthy(compose, deps_cd)
++            continue
++
+         if deps_cd:
+             # podman wait will return always with a rc -1.
+             while True:
+@@ -3086,7 +3135,11 @@ async def run_container(
+     # wait for the dependencies to be fulfilled
+     if "start" in command:
+         log.debug("Checking dependencies prior to container %s start", name)
+-        await check_dep_conditions(compose, deps)
++        try:
++            await check_dep_conditions(compose, deps)
++        except DependencyFailedError as exc:
++            log.error("not starting container %s: %s", name, exc)
++            return 1
+ 
+     # start the container
+     log.debug("Starting task for container %s", name)

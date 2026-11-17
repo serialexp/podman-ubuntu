@@ -110,6 +110,33 @@ compose up -d --force-recreate web
 compose down
 echo "podman-compose: up, up again, --force-recreate one service"
 
+# Our patch: a service_healthy dependency that cannot become healthy (this
+# one has no healthcheck) fails the dependent's start, where upstream waits
+# for ever.
+mkdir /compose-dep
+cat >/compose-dep/compose.yaml <<'EOF'
+services:
+  db:
+    image: docker.io/library/busybox:latest
+    command: ["sh", "-c", "trap exit TERM; sleep 600 & wait"]
+  app:
+    image: docker.io/library/busybox:latest
+    command: ["sh", "-c", "trap exit TERM; sleep 600 & wait"]
+    depends_on:
+      db:
+        condition: service_healthy
+EOF
+dep_rc=0
+dep_out=$(timeout 120 podman-compose -p smokedep -f /compose-dep/compose.yaml up -d 2>&1) || dep_rc=$?
+[ "$dep_rc" -ne 124 ] || { echo "up waited for a dependency that cannot become healthy" >&2; exit 1; }
+[ "$dep_rc" -ne 0 ] || { echo "up succeeded with a dependency that has no healthcheck" >&2; exit 1; }
+case "$dep_out" in
+  *"has no healthcheck"*) ;;
+  *) echo "up failed, but not on the dependency: $dep_out" >&2; exit 1 ;;
+esac
+podman-compose -p smokedep -f /compose-dep/compose.yaml down >/dev/null
+echo "podman-compose: an unhealthy dependency fails the start"
+
 # Rootless, the reason this stack exists: with rootless_port_forwarder =
 # "pasta", a port published from a bridge network sees the client's real
 # address. The client must be off this host: pasta gives a connection from

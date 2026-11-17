@@ -69,6 +69,10 @@ case "$1" in
     # One Python module and a launcher, laid out as Ubuntu's package has
     # them; postinst byte-compiles the module as dh_python3 would.
     p="$STAGE/podman-compose"
+    cd "$SRC/podman-compose"
+    for patch in /build/patches/podman-compose/*.patch; do
+      git apply "$patch"
+    done
     install -D -m 644 "$SRC/podman-compose/podman_compose.py" "$p/usr/lib/python3/dist-packages/podman_compose.py"
     install -D -m 755 /dev/stdin "$p/usr/bin/podman-compose" <<'EOF'
 #!/usr/bin/python3
